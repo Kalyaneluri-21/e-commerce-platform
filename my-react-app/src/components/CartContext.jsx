@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import { auth } from '../firebase';
 
 const CartContext = createContext();
 
-const initialState = JSON.parse(localStorage.getItem('cart')) || [];
+function getCartKey(uid) {
+  return uid ? `cart_${uid}` : null;
+}
 
 function cartReducer(state, action) {
   switch (action.type) {
+    case 'INIT':
+      return action.cart || [];
     case 'ADD': {
       const exists = state.find(item => item.id === action.product.id);
       if (exists) {
@@ -37,11 +42,43 @@ function cartReducer(state, action) {
 }
 
 export function CartProvider({ children }) {
-  const [cart, dispatch] = useReducer(cartReducer, initialState);
+  const [cart, dispatch] = useReducer(cartReducer, []);
+  const [user, setUser] = React.useState(auth.currentUser);
+  const prevUid = useRef();
 
+  // Listen for auth changes
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
-  }, [cart]);
+    const unsubscribe = auth.onAuthStateChanged(u => setUser(u));
+    return unsubscribe;
+  }, []);
+
+  // Load cart from localStorage when user changes
+  useEffect(() => {
+    const uid = user?.uid;
+    if (uid && prevUid.current !== uid) {
+      const key = getCartKey(uid);
+      const stored = key ? JSON.parse(localStorage.getItem(key)) : [];
+      dispatch({ type: 'INIT', cart: stored || [] });
+      prevUid.current = uid;
+    }
+    if (!uid) {
+      dispatch({ type: 'INIT', cart: [] });
+      prevUid.current = undefined;
+    }
+  }, [user]);
+
+  // Sync cart to localStorage for current user
+  useEffect(() => {
+    const uid = user?.uid;
+    const key = getCartKey(uid);
+    if (key) {
+      if (cart.length === 0) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, JSON.stringify(cart));
+      }
+    }
+  }, [cart, user]);
 
   const addToCart = product => dispatch({ type: 'ADD', product });
   const removeFromCart = id => dispatch({ type: 'REMOVE', id });
