@@ -1,54 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, orderBy, limit, startAfter, updateDoc, doc } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-
-// ProductRow subcomponent
-function ProductRow({ product, isEditing, onEdit, onChange, onSave, onCancel }) {
-  const [editData, setEditData] = useState(product);
-
-  useEffect(() => {
-    setEditData(product);
-  }, [product]);
-
-  const handleChange = (e) => {
-    setEditData({ ...editData, [e.target.name]: e.target.value });
-  };
-
-  return (
-    <tr className="bg-white border-b hover:bg-gray-50">
-      <td className="px-4 py-2 text-sm text-gray-900 font-medium">
-        {isEditing ? (
-          <input name="title" value={editData.title} onChange={handleChange} className="border rounded px-2 py-1 w-full" />
-        ) : product.title}
-      </td>
-      <td className="px-4 py-2 text-sm">{isEditing ? (
-        <input name="category" value={editData.category} onChange={handleChange} className="border rounded px-2 py-1 w-full" />
-      ) : product.category}</td>
-      <td className="px-4 py-2 text-sm">{isEditing ? (
-        <input name="price" type="number" value={editData.price} onChange={handleChange} className="border rounded px-2 py-1 w-full" />
-      ) : `$${product.price}`}</td>
-      <td className="px-4 py-2 text-sm">{isEditing ? (
-        <input name="stock" type="number" value={editData.stock} onChange={handleChange} className="border rounded px-2 py-1 w-full" />
-      ) : product.stock}</td>
-      <td className="px-4 py-2 text-sm max-w-xs truncate">{isEditing ? (
-        <input name="description" value={editData.description} onChange={handleChange} className="border rounded px-2 py-1 w-full" />
-      ) : product.description}</td>
-      <td className="px-4 py-2 text-sm">
-        <img src={product.imageUrl} alt={product.title} className="h-12 w-12 object-cover rounded" />
-      </td>
-      <td className="px-4 py-2 text-sm">
-        {isEditing ? (
-          <div className="flex gap-2">
-            <button onClick={() => onSave(editData)} className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">Save</button>
-            <button onClick={onCancel} className="bg-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-400">Cancel</button>
-          </div>
-        ) : (
-          <button onClick={onEdit} className="bg-indigo-500 text-white px-2 py-1 rounded hover:bg-indigo-600">Edit</button>
-        )}
-      </td>
-    </tr>
-  );
-}
 
 // Pagination subcomponent
 function Pagination({ page, totalPages, onPageChange }) {
@@ -113,11 +65,10 @@ function FilterControls({ category, setCategory, sortBy, setSortBy, sortOrder, s
 
 const PAGE_SIZE = 10;
 
-export default function ProductTable() {
+export default function ProductTable({ onEdit }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [editingId, setEditingId] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [category, setCategory] = useState('');
@@ -167,31 +118,13 @@ export default function ProductTable() {
     })();
   }, [vendorId, page, category, sortBy, sortOrder]);
 
-  // Edit handlers
-  const handleEdit = (id) => setEditingId(id);
-  const handleCancel = () => setEditingId(null);
-  const handleSave = async (editData) => {
-    try {
-      await updateDoc(doc(db, 'products', editData.id), {
-        ...editData,
-        price: Number(editData.price),
-        stock: Number(editData.stock),
-      });
-      setEditingId(null);
-      // Refresh products
-      setPage(1); // To force reload
-    } catch {
-      setError('Failed to save changes.');
-    }
-  };
-
   // Pagination handler
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) setPage(newPage);
   };
 
   return (
-    <div className="mt-10">
+    <div className="w-full mt-10">
       <h3 className="text-xl font-semibold mb-4">Your Products</h3>
       <FilterControls
         category={category}
@@ -209,30 +142,32 @@ export default function ProductTable() {
       ) : products.length === 0 ? (
         <div className="text-center text-gray-500 py-8">No products found.</div>
       ) : (
-        <div className="overflow-x-auto rounded shadow">
+        <div className="overflow-x-auto rounded shadow w-full">
           <table className="min-w-full bg-white">
             <thead>
               <tr>
                 <th className="px-4 py-2 text-left">Title</th>
                 <th className="px-4 py-2 text-left">Category</th>
-                <th className="px-4 py-2 text-left cursor-pointer">Price</th>
-                <th className="px-4 py-2 text-left cursor-pointer">Stock</th>
+                <th className="px-4 py-2 text-left">Price</th>
+                <th className="px-4 py-2 text-left">Stock</th>
                 <th className="px-4 py-2 text-left">Description</th>
-                <th className="px-4 py-2 text-left">Image</th>
+                <th className="px-4 py-2 text-left">Image URL</th>
                 <th className="px-4 py-2 text-left">Action</th>
               </tr>
             </thead>
             <tbody>
               {products.map(product => (
-                <ProductRow
-                  key={product.id}
-                  product={product}
-                  isEditing={editingId === product.id}
-                  onEdit={() => handleEdit(product.id)}
-                  onChange={() => {}}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                />
+                <tr key={product.id} className="bg-white border-b hover:bg-gray-50">
+                  <td className="px-4 py-2 text-sm text-gray-900 font-medium">{product.title}</td>
+                  <td className="px-4 py-2 text-sm">{product.category}</td>
+                  <td className="px-4 py-2 text-sm">${product.price}</td>
+                  <td className="px-4 py-2 text-sm">{product.stock}</td>
+                  <td className="px-4 py-2 text-sm max-w-xs truncate">{product.description}</td>
+                  <td className="px-4 py-2 text-sm break-all">{product.imageUrl}</td>
+                  <td className="px-4 py-2 text-sm">
+                    <button onClick={() => onEdit(product)} className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600">Edit</button>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>

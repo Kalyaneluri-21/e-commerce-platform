@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import ProductTable from './ProductTable';
+import EditProductForm from './EditProductForm';
 
 const initialForm = {
   title: '',
@@ -22,6 +23,8 @@ const VendorDashboard = () => {
   const [formSuccess, setFormSuccess] = useState('');
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('add');
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [tableKey, setTableKey] = useState(0); // for forcing table refresh
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -105,9 +108,9 @@ const VendorDashboard = () => {
         </div>
       </nav>
 
-      <main className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="w-full max-w-7xl mx-auto py-8 px-2 sm:px-6 lg:px-8">
         {/* Tab Navigation */}
-        <div className="flex mb-6 border-b border-gray-200">
+        <div className="flex mb-6 border-b border-gray-200 w-full">
           <button
             className={`px-4 py-2 font-medium focus:outline-none transition border-b-2 ${activeTab === 'add' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-indigo-600'}`}
             onClick={() => setActiveTab('add')}
@@ -123,7 +126,7 @@ const VendorDashboard = () => {
         </div>
         {/* Tab Content */}
         {activeTab === 'add' && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="w-full bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Add New Product</h2>
             <form className="space-y-5" onSubmit={handleSubmit}>
               {formError && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded">{formError}</div>}
@@ -223,7 +226,24 @@ const VendorDashboard = () => {
             </form>
           </div>
         )}
-        {activeTab === 'view' && <ProductTable />}
+        {activeTab === 'view' && (
+          <div className="w-full">
+            <ProductTable
+              key={tableKey}
+              onEdit={product => setEditingProduct(product)}
+            />
+            {editingProduct && (
+              <EditProductForm
+                product={editingProduct}
+                onSave={updatedProduct => {
+                  setEditingProduct(null);
+                  setTableKey(k => k + 1); // force table refresh
+                }}
+                onCancel={() => setEditingProduct(null)}
+              />
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
