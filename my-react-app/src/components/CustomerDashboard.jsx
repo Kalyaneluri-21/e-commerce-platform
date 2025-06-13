@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { FiSearch } from 'react-icons/fi';
+import { CartProvider } from './CartContext';
+import CartIcon from './CartIcon';
+import { useCart } from './CartContext';
 
 const PRICE_RANGES = [
   { label: '₹10–₹100', min: 10, max: 100 },
@@ -13,7 +16,7 @@ const PRICE_RANGES = [
   { label: '₹10,000 and above', min: 10000, max: Infinity },
 ];
 
-export default function CustomerDashboard() {
+function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -23,6 +26,7 @@ export default function CustomerDashboard() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const navigate = useNavigate();
+  const { addToCart } = useCart();
 
   // Auth protection
   useEffect(() => {
@@ -92,12 +96,15 @@ export default function CustomerDashboard() {
               <FiSearch size={22} />
             </button>
           </form>
-          <button
-            onClick={() => auth.signOut()}
-            className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-4">
+            <CartIcon onClick={() => navigate('/cart')} />
+            <button
+              onClick={() => auth.signOut()}
+              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </nav>
       <main className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 w-full">
@@ -150,11 +157,25 @@ export default function CustomerDashboard() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-1 text-center w-full truncate">{product.title}</h3>
                 <div className="text-indigo-600 font-bold text-lg mb-1">₹{product.price}</div>
                 <div className="text-gray-500 text-sm mb-2">{product.brand}</div>
+                <button
+                  className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-md shadow-md transition text-base"
+                  onClick={() => navigate(`/product/${product.id}`)}
+                >
+                  View Product
+                </button>
               </div>
             ))}
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+export default function CustomerDashboard() {
+  return (
+    <CartProvider>
+      <DashboardContent />
+    </CartProvider>
   );
 } 
