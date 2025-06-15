@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { FiEdit2, FiChevronUp, FiChevronDown, FiFilter, FiTrash2 } from 'react-icons/fi';
 
@@ -53,30 +53,36 @@ export default function ProductTable({ onEdit }) {
     if (!vendorId) return;
     setLoading(true);
     setError('');
+    let unsub;
     (async () => {
       let q = query(
         collection(db, 'products'),
         where('vendorId', '==', vendorId)
       );
-      const snapshot = await getDocs(q);
-      let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if (category) {
-        data = data.filter(p => p.category === category);
-      }
-      data = data.sort((a, b) => {
-        if (sortBy === 'price' || sortBy === 'stock') {
-          return sortOrder === 'asc'
-            ? Number(a[sortBy]) - Number(b[sortBy])
-            : Number(b[sortBy]) - Number(a[sortBy]);
+      unsub = onSnapshot(q, (snapshot) => {
+        let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (category) {
+          data = data.filter(p => p.category === category);
         }
-        return 0;
+        data = data.sort((a, b) => {
+          if (sortBy === 'price' || sortBy === 'stock') {
+            return sortOrder === 'asc'
+              ? Number(a[sortBy]) - Number(b[sortBy])
+              : Number(b[sortBy]) - Number(a[sortBy]);
+          }
+          return 0;
+        });
+        setTotalPages(Math.max(1, Math.ceil(data.length / PAGE_SIZE)));
+        const paged = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        setProducts(paged);
+        setCategories([...new Set(snapshot.docs.map(doc => doc.data().category).filter(Boolean))]);
+        setLoading(false);
+      }, (err) => {
+        setError('Failed to load products.');
+        setLoading(false);
       });
-      setTotalPages(Math.max(1, Math.ceil(data.length / PAGE_SIZE)));
-      const paged = data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-      setProducts(paged);
-      setCategories([...new Set(snapshot.docs.map(doc => doc.data().category).filter(Boolean))]);
-      setLoading(false);
     })();
+    return () => { if (unsub) unsub(); };
   }, [vendorId, page, category, sortBy, sortOrder, deletingId]);
 
   const handleSort = (col) => {

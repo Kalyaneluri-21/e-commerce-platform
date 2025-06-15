@@ -1,6 +1,8 @@
 import { useCart } from './CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { db } from '../firebase';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
 export default function CartPage() {
   const { cart, removeFromCart, increment, decrement, setQuantity, clearCart } = useCart();
@@ -8,6 +10,8 @@ export default function CartPage() {
   const navigate = useNavigate();
   const [errors, setErrors] = useState({});
   const [checkoutError, setCheckoutError] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleQuantityChange = (item, value) => {
     let qty = Number(value);
@@ -23,19 +27,36 @@ export default function CartPage() {
     });
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     let hasError = false;
     const newErrors = {};
-    cart.forEach(item => {
+    for (const item of cart) {
       if (item.quantity > item.stock) {
         newErrors[item.id] = `Only ${item.stock} items are available in stock.`;
         hasError = true;
       }
-    });
+    }
     setErrors(newErrors);
     setCheckoutError(hasError);
-    if (!hasError) {
-      alert('Checkout is not implemented yet.');
+    if (hasError) return;
+    setLoading(true);
+    try {
+      // Atomically update stock for each product
+      for (const item of cart) {
+        const productRef = doc(db, 'products', item.id);
+        // Get latest stock
+        const snap = await getDoc(productRef);
+        const currentStock = snap.data().stock;
+        const newStock = Math.max(0, currentStock - item.quantity);
+        await updateDoc(productRef, { stock: newStock });
+      }
+      setSuccess(true);
+      clearCart();
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      alert('Failed to complete purchase. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,12 +106,17 @@ export default function CartPage() {
             <span>Total:</span>
             <span>₹{total}</span>
           </div>
+          {success && (
+            <div className="w-full mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded text-center animate-fadeIn">
+              Purchase successful 🎉
+            </div>
+          )}
           <button
             className="w-full mb-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-md shadow-md transition text-lg"
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || loading}
             onClick={handleCheckout}
           >
-            Checkout
+            {loading ? 'Processing...' : 'Checkout'}
           </button>
           <button
             className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-md shadow-md transition"
