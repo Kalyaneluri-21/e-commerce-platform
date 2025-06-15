@@ -34,6 +34,12 @@ function cartReducer(state, action) {
           ? { ...item, quantity: item.quantity - 1 }
           : item
       );
+    case 'SET_QUANTITY':
+      return state.map(item =>
+        item.id === action.id
+          ? { ...item, quantity: action.quantity }
+          : item
+      );
     case 'CLEAR':
       return [];
     default:
@@ -84,10 +90,11 @@ export function CartProvider({ children }) {
   const removeFromCart = id => dispatch({ type: 'REMOVE', id });
   const increment = id => dispatch({ type: 'INCREMENT', id });
   const decrement = id => dispatch({ type: 'DECREMENT', id });
+  const setQuantity = (id, quantity) => dispatch({ type: 'SET_QUANTITY', id, quantity });
   const clearCart = () => dispatch({ type: 'CLEAR' });
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, increment, decrement, clearCart }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, increment, decrement, setQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );
